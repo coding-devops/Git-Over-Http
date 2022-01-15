@@ -52,3 +52,8 @@ func handleRefsHeader(w *http.ResponseWriter, service string) {
 	(*w).Header().Set("Pragma", "no-cache")
 	(*w).Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
 }
+
+//todo new feature:  will support "git clone" soon
+func nothing() {
+
+}
