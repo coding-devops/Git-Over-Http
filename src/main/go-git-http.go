@@ -11,14 +11,20 @@ import (
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/{repo}/info/refs", index)
-	//r.HandleFunc("/qwe/info/refs", outdex)
+	r.HandleFunc("/http/test", outdex)
 	http.Handle("/", r)
 	http.ListenAndServe(":9090", nil)
 }
 
 func outdex(w http.ResponseWriter, r *http.Request) {
-	test := fmt.Sprintf("%04x# service=upload-pack", 20)
-	log.Println(test)
+	//test := fmt.Sprintf("%04x# service=upload-pack", 20)
+	//log.Println(test)
+	buf := make([]byte, 1024) // 输入流缓存数组
+	n, _ := r.Body.Read(buf)
+	fmt.Println("123： ", string(buf[0:n]))
+	// 或者
+	//body, _ := ioutil.ReadAll(r.Body)
+	//fmt.Println("456: ", string(body))
 }
 func index(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
