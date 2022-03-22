@@ -3,13 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"os/exec"
 	"syscall"
-
-	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -21,7 +20,7 @@ func main() {
 	log.Printf("========================================================\n")
 
 	r := mux.NewRouter()
-	r.HandleFunc("/{repo}/info/refs", index).Methods("GET")
+	r.HandleFunc("/{repo}/info/refs", infoRefs).Methods("GET")
 	r.HandleFunc("/{repo}/git-upload-pack", HandleGitUpload).Methods("POST")
 	r.HandleFunc("/{repo}/git-receive-pack", ReceivePack).Methods("POST")
 
@@ -74,16 +73,6 @@ func epoll(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}()
-
-	//go func() {
-	//	for {
-	//		select {
-	//		case msg := <-wait_list:
-	//		case:
-	//
-	//		}
-	//	}
-	//}()
 }
 
 func Kill(cmd *exec.Cmd) {
@@ -148,7 +137,7 @@ func outdex(w http.ResponseWriter, r *http.Request) {
 	// 或者
 	//fmt.Println("456: ", string(body))
 }
-func index(w http.ResponseWriter, r *http.Request) {
+func infoRefs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	repoName := vars["repo"]
 	log.Println("repo_name: ", repoName)
