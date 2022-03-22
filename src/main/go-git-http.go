@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +21,69 @@ func main() {
 	log.Printf("========================================================\n")
 
 	r := mux.NewRouter()
-	r.HandleFunc("/{repo}/info/refs", index)
-	r.HandleFunc("/{repo}/git-upload-pack", HandleGitUpload)
+	r.HandleFunc("/{repo}/info/refs", index).Methods("GET")
+	r.HandleFunc("/{repo}/git-upload-pack", HandleGitUpload).Methods("POST")
+	r.HandleFunc("/{repo}/git-receive-pack", ReceivePack).Methods("POST")
+
+	r.HandleFunc("/test/epoll", epoll)
 
 	r.HandleFunc("/http/test", outdex)
 	http.Handle("/", r)
 	http.ListenAndServe(":9090", nil)
+}
+func init() {
+
+}
+
+type Commonchan struct {
+	stringchan chan string
+}
+
+type ReqJson struct {
+	msg       string `json:"msg"`
+	PkgId     string `json:"PkgId"`
+	VersionId string `json:"VersionId"`
+}
+
+func epoll(res http.ResponseWriter, req *http.Request) {
+	//维护一个等待被执行队列
+	a := make(chan string, 100)
+	commonchan := &Commonchan{
+		stringchan: a,
+	}
+	var test *ReqJson
+	var by []byte
+	if _, err := req.Body.Read(by); err != nil {
+		//请求体读取失败
+		log.Printf("读取body报错了")
+		return
+	}
+	err := json.Unmarshal(by, test)
+	if err != nil {
+		log.Printf("反序列化报错了")
+		return
+	}
+	//启动一个 worker 协程
+	go func() {
+		for {
+			select {
+			case commonchan.stringchan <- test.msg:
+				log.Printf("等待队列写入了一条数据：", test.msg)
+			default:
+
+			}
+		}
+	}()
+
+	//go func() {
+	//	for {
+	//		select {
+	//		case msg := <-wait_list:
+	//		case:
+	//
+	//		}
+	//	}
+	//}()
 }
 
 func Kill(cmd *exec.Cmd) {
@@ -37,7 +95,23 @@ func Kill(cmd *exec.Cmd) {
 	}
 }
 
-func TestArg(n int, d func(a string, b string)) {
+func ReceivePack(res http.ResponseWriter, req *http.Request) {
+	repoPath := "/Users/freddie/private/study-docs/test-client/1.git"
+	cmdPack := exec.Command("git", "receive-pack", "--stateless-rpc", repoPath)
+	cmdStdin, err := cmdPack.StdinPipe()
+	cmdStdout, err := cmdPack.StdoutPipe()
+	err = cmdPack.Start()
+	if err != nil {
+		_, _ = res.Write([]byte(err.Error()))
+		return
+	}
+	go func() {
+		_, _ = io.Copy(cmdStdin, req.Body)
+		_ = cmdStdin.Close()
+	}()
+	_, _ = io.Copy(res, cmdStdout)
+	_ = cmdPack.Wait() // wait for std complete
+	Kill(cmdPack)
 }
 
 // 完成git upload
@@ -51,7 +125,11 @@ func HandleGitUpload(res http.ResponseWriter, req *http.Request) {
 		_, _ = res.Write([]byte(err.Error()))
 		return
 	}
-	// transfer data
+	res.Header().Set("Content-Type", fmt.Sprintf("application/x-%s-result", "git-upload-pack"))
+	res.Header().Set("Connection", "Keep-Alive")
+	res.Header().Set("Transfer-Encoding", "chunked")
+	res.Header().Set("X-Content-Type-Options", "nosniff")
+
 	go func() {
 		_, _ = io.Copy(cmdStdin, req.Body)
 		_ = cmdStdin.Close()
@@ -68,7 +146,6 @@ func outdex(w http.ResponseWriter, r *http.Request) {
 	n, _ := r.Body.Read(buf)
 	fmt.Println("123： ", string(buf[0:n]))
 	// 或者
-	//body, _ := ioutil.ReadAll(r.Body)
 	//fmt.Println("456: ", string(body))
 }
 func index(w http.ResponseWriter, r *http.Request) {
@@ -89,11 +166,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 	// git upload-pack --stateless-rpc --advertise-refs /Users/freddie/private/study-docs/test-client/1.git
 	cmdRefs := exec.Command("git", service[4:], "--stateless-rpc", "--advertise-refs", repoPath)
 	refsBytes, _ := cmdRefs.Output()
-	log.Println("tttttt")
-	fmt.Print(cmdRefs.Run())
 	responseBody := fmt.Sprintf("%04x# service=%s\n0000%s", len(pFirst)+4, service, string(refsBytes)) // 拼接 Body
-	log.Println("tttttt")
-	log.Println("response body ----以下")
 	fmt.Printf(responseBody)
 	handleRefsHeader(&w, service)
 	_, _ = w.Write([]byte(responseBody))
