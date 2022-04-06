@@ -12,5 +12,5 @@ require (
 	asd
 	asd
 	asd
-	asd
+	asdasdasd
 )
