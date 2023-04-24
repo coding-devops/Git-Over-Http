@@ -1,0 +1,6 @@
+[submodule "func_trace_tool"]
+	path = func_trace_tool
+	url = https://github.com/coding-devops/func_trace_tool
+[submodule "notes"]
+	path = notes
+	url = https://github.com/coding-devops/notes.git
